@@ -1,0 +1,18 @@
+name: Post release topic on Discourse
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: roots/discourse-topic-github-release-action@main
+      with:
+        discourse-api-key: ea2c3040089680720c788f1af3ab208cbb84b47e722192e61b774a00b4a309f2
+        discourse-base-url: https://forum.netbird.io
+        discourse-author-username: NetBird
+        discourse-category: 17
+        discourse-tags:
+          releases       
