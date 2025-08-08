@@ -1,0 +1,72 @@
+name: Docs Acknowledgement
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+
+jobs:
+  docs-ack:
+    name: Require docs or explicit "not needed"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Fetch base
+        run: |
+          git fetch origin ${{ github.event.pull_request.base.ref }} --depth=1
+
+      - name: Read PR body
+        id: body
+        run: |
+          BODY=$(jq -r '.pull_request.body // ""' "$GITHUB_EVENT_PATH")
+          echo "body<<EOF" >> $GITHUB_OUTPUT
+          echo "$BODY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Validate checkbox selection
+        id: validate
+        run: |
+          body='${{ steps.body.outputs.body }}'
+
+          # Count checked boxes
+          added_checked=$(printf "%s" "$body" | grep -E '^- \[x\] I added/updated documentation' -i | wc -l | tr -d ' ')
+          noneed_checked=$(printf "%s" "$body" | grep -E '^- \[x\] Documentation is \*\*not needed\*\*' -i | wc -l | tr -d ' ')
+
+          if [ "$added_checked" -eq 1 ] && [ "$noneed_checked" -eq 1 ]; then
+            echo "::error::Choose exactly one docs option, not both."
+            exit 1
+          fi
+
+          if [ "$added_checked" -eq 0 ] && [ "$noneed_checked" -eq 0 ]; then
+            echo "::error::You must check exactly one docs option in the PR template."
+            exit 1
+          fi
+
+          # Pass the result to later step
+          if [ "$added_checked" -eq 1 ]; then
+            echo "mode=added" >> $GITHUB_OUTPUT
+          else
+            echo "mode=noneed" >> $GITHUB_OUTPUT
+          fi
+
+      - name: If "docs added", verify docs actually changed
+        if: steps.validate.outputs.mode == 'added'
+        run: |
+          # Diff base...head for changed files
+          DIFF=$(git diff --name-only origin/${{ github.event.pull_request.base.ref }}...${{ github.sha }})
+          echo "Changed files:"
+          echo "$DIFF"
+
+          # Define what counts as docs (adjust paths as needed)
+          echo "$DIFF" | grep -E '^(docs/|DOCUMENTATION/|README\.md|CHANGELOG\.md|.*\.md$)' >/dev/null || {
+            echo "::error::You checked 'docs added' but no documentation files were changed. Update files under docs/ or README.md, etc."
+            exit 1
+          }
+
+      - name: Success
+        run: echo "Documentation acknowledgment satisfied ✅"
