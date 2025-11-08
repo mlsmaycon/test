@@ -1,8 +1,12 @@
+apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: testapp1-deployment
+  annotations:
+    argocd.argoproj.io/tracking-id: test-app:/Deployment:default/testapp1-deployment
   labels:
     app: testapp1
+  name: testapp1-deployment
+  namespace: default
 spec:
   replicas: 3
   selector:
@@ -14,7 +18,7 @@ spec:
         app: testapp1
     spec:
       containers:
-      - name: testapp1
-        image: nginx:1.14.2
-        ports:
-        - containerPort: 80
+        - image: nginx:1.14.2
+          name: testapp1
+          ports:
+            - containerPort: 80
